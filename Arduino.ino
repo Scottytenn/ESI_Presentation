@@ -19,8 +19,7 @@ const int PING_SAMPLES = 10;
 
 bool operate = true;
 int current = MIN_DEG;
-
-int gPosForAbort = MIN_DEG;
+int PosForAbort = MIN_DEG;
 
 
 const unsigned long DEBOUNCE_MS = 40;
@@ -117,7 +116,7 @@ float readDistanceCmSamples(float samples[], int n) {
   for (int i = 0; i < n; i++) {
     if (buttonPressedEdge()) {
       operate = !operate;
-      current = gPosForAbort;
+      current = PosForAbort;
       return NAN; 
     }
     sendpulse(trig, 2, 10);
@@ -140,7 +139,7 @@ float readDistanceCmSamples(float samples[], int n) {
 
     if (buttonPressedEdge()) {
       operate = !operate;
-      current = gPosForAbort;
+      current = PosForAbort;
       return NAN;
     }
 
@@ -184,14 +183,11 @@ void loop() {
       pos = current; 
     } else {
       gotoAngleAndHold(pos, SETTLE_FRAMES);
-      if (!operate) { pos = current; continue; } 
 
       float samples[PING_SAMPLES];
-      gPosForAbort = pos;    
+      PosForAbort = pos;    
       float avg = readDistanceCmSamples(samples, PING_SAMPLES);
       buzzIfClose(avg);
-      if (!operate) { pos = current; continue; } 
-
       printPositionLine(pos, avg, samples, PING_SAMPLES);
     }
   }
@@ -208,14 +204,11 @@ void loop() {
       pos = current;  
     } else {
       gotoAngleAndHold(pos, SETTLE_FRAMES);
-      if (!operate) { pos = current; continue; } 
 
       float samples[PING_SAMPLES];
-      gPosForAbort = pos;   
+      PosForAbort = pos;   
       float avg = readDistanceCmSamples(samples, PING_SAMPLES);
       buzzIfClose(avg);
-      if (!operate) { pos = current; continue; } 
-
       printPositionLine(pos, avg, samples, PING_SAMPLES);
     }
   }

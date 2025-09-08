@@ -1,0 +1,44 @@
+clear; close all; clc
+
+%Data
+% Δpulse = 1000
+p1000 = [1000 1200 1400 1600];
+a1000 = [  80   82   81   90];
+
+% Δpulse = 1900
+p1900 = [550 530 505 500 400 300];
+a1900 = [163 172 173 176 170 155];
+
+[p1000s, i1] = sort(p1000);  a1000s = a1000(i1);
+[p1900s, i2] = sort(p1900);  a1900s = a1900(i2);
+
+m1 = polyfit(p1000s, a1000s, 1);     % linear fit
+m2 = polyfit(p1900s, a1900s, 2);     % quadratic fit
+
+xp1 = linspace(min(p1000s), max(p1000s), 200);
+yp1 = polyval(m1, xp1);
+
+xp2 = linspace(min(p1900s), max(p1900s), 200);
+yp2 = polyval(m2, xp2);
+
+%Plot 1
+figure;
+scatter(p1000s, a1000s, 60, 'b', 'filled'); hold on
+plot(xp1, yp1, 'r-', 'LineWidth', 1.5)
+xlabel('Pulse width (\mu s)')
+ylabel('Measured angle (deg)')
+title('Calibration curve (\Delta pulse = 1000)')
+legend('Data', sprintf('Linear fit: angle = %.4f*pulse + %.2f', m1(1), m1(2)), ...
+       'Location','best')
+grid on
+
+%Plot 2: Δpulse = 1900
+figure;
+scatter(p1900s, a1900s, 60, 'g', 'filled'); hold on
+plot(xp2, yp2, 'r-', 'LineWidth', 1.5)
+xlabel('Pulse width (\mu s)')
+ylabel('Measured angle (deg)')
+title('Calibration curve (\Delta pulse = 1900)')
+legend('Data', sprintf('Quadratic fit: angle = %.4e*pulse^2 + %.4f*pulse + %.2f', ...
+        m2(1), m2(2), m2(3)), 'Location','best')
+grid on
