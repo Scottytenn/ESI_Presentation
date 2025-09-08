@@ -1,0 +1,205 @@
+const int trig = 8;
+const int echo = 7;
+const int pinServo = 9;
+
+const long T_TOTAL_US = 20 * 1000;
+const long SERVO_MIN_US = 500;
+const long SERVO_MAX_US = 2500;
+
+const int MIN_DEG = 30;
+const int MAX_DEG = 150;
+const int STEP_DEG = 10;
+
+const int SETTLE_FRAMES = 50;
+const unsigned long PULSE_TIMEOUT_US = 30000;
+const int PING_SAMPLES = 10;
+
+const int buttonpin = 6;
+bool operate = true;
+int current = MIN_DEG;
+
+int gPosForAbort = MIN_DEG;
+
+
+const unsigned long DEBOUNCE_MS = 40;
+bool btnStable = HIGH;        
+bool btnReading = HIGH;
+unsigned long btnLastChange = 0;
+
+
+bool buttonPressedEdge() {
+  bool raw = digitalRead(buttonpin);
+  long now = millis();
+
+  if (raw != btnReading) {
+    btnReading = raw;
+    btnLastChange = now;
+  }
+
+  if ((now - btnLastChange) >= DEBOUNCE_MS && raw != btnStable) {
+    bool prevStable = btnStable;
+    btnStable = raw;
+    if (prevStable == HIGH && btnStable == LOW) {
+      return true; 
+    }
+  }
+  return false;
+}
+
+void setup() {
+  Serial.begin(9600);
+  pinMode(trig, OUTPUT);
+  pinMode(echo, INPUT);
+  pinMode(pinServo, OUTPUT);
+  writeServoAngle((MIN_DEG + MAX_DEG) / 2);
+
+  pinMode(buttonpin, INPUT_PULLUP);
+}
+
+void servoPulse(int pin, unsigned long hi_us) {
+  digitalWrite(pin, HIGH);
+  delayMicroseconds(hi_us);
+  digitalWrite(pin, LOW);
+  long lo_us = (hi_us < T_TOTAL_US) ? (T_TOTAL_US - hi_us) : 0;
+  delayMicroseconds(lo_us);
+}
+
+long angleToUs(int deg) {
+  return map(deg, 0, 180, SERVO_MIN_US, SERVO_MAX_US);
+}
+
+void writeServoAngle(int deg) {
+  servoPulse(pinServo, angleToUs(deg));
+}
+
+void gotoAngleAndHold(int deg, int frames) {
+  unsigned long hi = angleToUs(deg);
+  for (int i = 0; i < frames; i++) {
+    servoPulse(pinServo, hi);
+
+    if (buttonPressedEdge()) {
+      operate = !operate;
+      current = deg;      
+      return;  
+    }
+  }
+}
+
+void sendpulse(int pin, int t1_us, int t2_us) {
+  digitalWrite(pin, LOW);
+  delayMicroseconds(t1_us);
+  digitalWrite(pin, HIGH);
+  delayMicroseconds(t2_us);
+  digitalWrite(pin, LOW);
+}
+
+float readDistanceCmSamples(float samples[], int n) {
+  const int WARMUP = 3;  
+  int count = 0;
+  int valid = 0;
+  float sum = 0.0;
+
+  for (int i = 0; i < n; i++) {
+    if (buttonPressedEdge()) {
+      operate = !operate;
+      current = gPosForAbort;
+      return NAN; 
+    }
+    sendpulse(trig, 2, 10);
+    long dur = pulseIn(echo, HIGH, PULSE_TIMEOUT_US); 
+
+    if (count >= WARMUP){
+        if (dur == 0) {
+          samples[i] = NAN;
+        } else {
+          samples[i] = dur / 58.0;
+          sum += samples[i];
+          valid++;
+        }
+    }
+    else{
+      i -= 1;
+    }
+    count += 1;
+    delay(80);
+
+    if (buttonPressedEdge()) {
+      operate = !operate;
+      current = gPosForAbort;
+      return NAN;
+    }
+
+  }
+
+  if (valid == 0) return NAN;
+  return sum / valid;
+}
+
+void printPositionLine(int posDeg, float average, const float samples[], int n) {
+  Serial.print(posDeg);
+  Serial.print(",");
+
+  if (isnan(average)) {
+    Serial.print("NaN");
+  } else {
+    Serial.print(average, 2);
+  }
+
+  for (int i = 0; i < n; i++) {
+    Serial.print(",");
+    if (isnan(samples[i])) {
+      Serial.print("NaN");
+    } else {
+      Serial.print(samples[i], 2);
+    }
+  }
+  Serial.println();
+}
+
+void loop() {
+
+  for (int pos = MIN_DEG; pos <= MAX_DEG; pos += STEP_DEG) {
+    if (buttonPressedEdge()) {
+      operate = !operate;
+      current = pos;
+    }
+
+    if (!operate) {
+      gotoAngleAndHold(current, SETTLE_FRAMES);
+      pos = current; 
+    } else {
+      gotoAngleAndHold(pos, SETTLE_FRAMES);
+      if (!operate) { pos = current; continue; } 
+
+      float samples[PING_SAMPLES];
+      gPosForAbort = pos;    
+      float avg = readDistanceCmSamples(samples, PING_SAMPLES);
+      if (!operate) { pos = current; continue; } 
+
+      printPositionLine(pos, avg, samples, PING_SAMPLES);
+    }
+  }
+
+
+  for (int pos = MAX_DEG; pos >= MIN_DEG; pos -= STEP_DEG) {
+    if (buttonPressedEdge()) {
+      operate = !operate;
+      current = pos;
+    }
+
+    if (!operate) {
+      gotoAngleAndHold(current, SETTLE_FRAMES);
+      pos = current;  
+    } else {
+      gotoAngleAndHold(pos, SETTLE_FRAMES);
+      if (!operate) { pos = current; continue; } 
+
+      float samples[PING_SAMPLES];
+      gPosForAbort = pos;   
+      float avg = readDistanceCmSamples(samples, PING_SAMPLES);
+      if (!operate) { pos = current; continue; } 
+
+      printPositionLine(pos, avg, samples, PING_SAMPLES);
+    }
+  }
+}
