@@ -127,7 +127,7 @@ float readDistanceCmSamples(float samples[], int n) {
         if (dur == 0) {
           samples[i] = NAN;
         } else {
-          samples[i] = dur / 58.0;
+          samples[i] = (dur/58.0)*1.0253+0.3725;
           sum += samples[i];
           valid++;
         }

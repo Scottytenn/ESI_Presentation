@@ -1,6 +1,6 @@
 clear; close all; clc
 
-device = serialport("COM11",9600);
+device = serialport("COM12",9600);
 device.Timeout = 0.3;
 flush(device);
 
@@ -77,5 +77,7 @@ end
     end
 
     set(h,'ThetaData',theta,'RData',r,'CData',C, 'AlphaData',des);
+    legend('Ultrasonic Data','Location','southoutside');
+    title('2D Range Finder Mapping');
     drawnow limitrate
 end

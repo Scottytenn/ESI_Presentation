@@ -1,7 +1,10 @@
 const int trig = 8;
 const int echo = 7;
 const int pinServo = 9;
+const int buttonpin = 6;
+const int buzzerPin = 5;   
 
+const float BUZZ_THRESHOLD_CM = 5; 
 const long T_TOTAL_US = 20 * 1000;
 const long SERVO_MIN_US = 500;
 const long SERVO_MAX_US = 2500;
@@ -14,7 +17,6 @@ const int SETTLE_FRAMES = 50;
 const unsigned long PULSE_TIMEOUT_US = 30000;
 const int PING_SAMPLES = 10;
 
-const int buttonpin = 6;
 bool operate = true;
 int current = MIN_DEG;
 
@@ -52,15 +54,28 @@ void setup() {
   pinMode(echo, INPUT);
   pinMode(pinServo, OUTPUT);
   writeServoAngle((MIN_DEG + MAX_DEG) / 2);
-
+  pinMode(buzzerPin, OUTPUT);
+  digitalWrite(buzzerPin, LOW);
   pinMode(buttonpin, INPUT_PULLUP);
+  noTone(buzzerPin);
 }
+
+void buzzIfClose(float avg_cm) {
+  if (isfinite(avg_cm) && avg_cm > 0 && avg_cm <= BUZZ_THRESHOLD_CM) {
+    int freq = 1000;
+    tone(buzzerPin, freq, 500);  
+  } else if(isfinite(avg_cm) && avg_cm > 0 && avg_cm > BUZZ_THRESHOLD_CM){
+    int freq = 200;
+    tone(buzzerPin, freq, 80);  
+  }
+}
+
 
 void servoPulse(int pin, unsigned long hi_us) {
   digitalWrite(pin, HIGH);
   delayMicroseconds(hi_us);
   digitalWrite(pin, LOW);
-  long lo_us = (hi_us < T_TOTAL_US) ? (T_TOTAL_US - hi_us) : 0;
+  unsigned long lo_us = (hi_us < T_TOTAL_US) ? (T_TOTAL_US - hi_us) : 0;
   delayMicroseconds(lo_us);
 }
 
@@ -106,13 +121,13 @@ float readDistanceCmSamples(float samples[], int n) {
       return NAN; 
     }
     sendpulse(trig, 2, 10);
-    long dur = pulseIn(echo, HIGH, PULSE_TIMEOUT_US); 
+    unsigned long dur = pulseIn(echo, HIGH, PULSE_TIMEOUT_US); 
 
     if (count >= WARMUP){
         if (dur == 0) {
           samples[i] = NAN;
         } else {
-          samples[i] = dur / 58.0;
+          samples[i] = (dur/58.0)*1.0253+0.3725;
           sum += samples[i];
           valid++;
         }
@@ -174,6 +189,7 @@ void loop() {
       float samples[PING_SAMPLES];
       gPosForAbort = pos;    
       float avg = readDistanceCmSamples(samples, PING_SAMPLES);
+      buzzIfClose(avg);
       if (!operate) { pos = current; continue; } 
 
       printPositionLine(pos, avg, samples, PING_SAMPLES);
@@ -197,6 +213,7 @@ void loop() {
       float samples[PING_SAMPLES];
       gPosForAbort = pos;   
       float avg = readDistanceCmSamples(samples, PING_SAMPLES);
+      buzzIfClose(avg);
       if (!operate) { pos = current; continue; } 
 
       printPositionLine(pos, avg, samples, PING_SAMPLES);
